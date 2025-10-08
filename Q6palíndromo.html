@@ -1,0 +1,34 @@
+<!--
+6) Fazer uma função para identificar se a palavra digitada no input type=text pelo usuário é um palíndromo ou não. Uma palavra é denominada um palíndromo se for invertida e a leitura dela permanecer sem nenhuma alteração. Ex.: aba, radar, reter, rever, rir. Após criada, chame a função usando eventos.
+-->
+<!DOCTYPE html>
+<html lang="br-pt">
+    <head>
+        <meta charset="utf-8">
+        <title> Palavra palíndromo.</title>
+    </head>
+    <h2>Verificar palíndromo</h2>
+    <body>
+        <lebel for="palavra">Digite uma palavra:</lebel>
+        <input type="text" id="palavra">
+        
+        <button onclick="verificarP()">Verificar</button>
+
+        <p id="resultado"></p>
+
+        <script>
+            function verificarP(){
+                let palavra=document.getElementById("palavra").value;
+                let palavraFormatada=palavra.toLowerCase().replace(/\s+/g, "");
+
+                let invertida=palavraFormatada.split("").reverse().join("");
+
+                if(palavraFormatada == invertida){
+                    document.getElementById("resultado").innerText=`"${palavra}" é um palíndromo`;
+                }else {
+                    document.getElementById("resultado").innerText=`"${palavra}" não é um palíndromo`;
+                }
+            }
+        </script>
+    </body>
+</html>

@@ -1,0 +1,29 @@
+<!--1) Crie um formulário simples com 4 botões e um parágrafo que, ao clicar em cada um, altere o 
+texto do parágrafo para vermelho, verde, azul e amarelo, respectivamente. 
+-->
+<!DOCTYPE hitm>
+
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>Botão de Cor</title>
+</head>
+<body>
+    <h1>Alterar cor do texto</h1>
+
+    <fram>
+        <button type="button" onclick="mudarcor('red')">Vermelho</button>
+        <button type="button" onclick="mudarcor('green')">Verde</button>
+        <button type="button" onclick="mudarcor('blue')">Azul</button>
+        <button type="button" onclick="mudarcor('yellow')">Amarelo</button>
+    </fram>
+
+    <p id="texto">Este é o texto que muda de cor. </p>
+
+    <script>
+        function mudarcor(cor){
+            document.getElementById("texto").style.color = cor;
+        }
+    </script>
+</body>
+</html>

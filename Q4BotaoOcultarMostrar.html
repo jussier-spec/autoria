@@ -1,0 +1,25 @@
+<!--4) Crie uma página que possua um parágrafo e um botão “Ocultar/Mostrar”. Ao clicar no botão 
+o parágrafo é ocultado (caso esteja sendo mostrado) ou exibido (caso esteja oculto).-->
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>Botão de ocultar e mostrar</title>
+</head>
+<body>
+    <p id="paragrafo">Ocultar e mostrar.</p>
+    <p>Escolha a opção.</p>
+    <button onclick="toggleParagrafo()">Ocultar/mostrar</button>
+
+    <script>
+        function toggleParagrafo(){
+            let p = document.getElementById("paragrafo");
+            if(p.style.display == "none"){
+                p.style.display = "block";
+            }else{
+                p.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>
