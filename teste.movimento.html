@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    /* Estilos simples para centralizar o canvas */
+    html,body{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif;background:#111;color:#eee;display:flex;align-items:center;justify-content:center}
+    #game{background:#222;border:4px solid #333;display:block}
+    .info{position:fixed;left:12px;top:12px;background:rgba(0,0,0,0.5);padding:8px;border-radius:6px;font-size:14px}
+  </style>
+</head>
+<body>
+  <canvas id="game" width="800" height="420"></canvas>
+
+  <script>
+    // Configurações
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Mundo / física
+    const gravity = 1500;
+    const groundHeight = 80; 
+
+    // Jogador
+    const player = {
+      x: 120,
+      y: H - groundHeight - 48, 
+      w: 40,
+      h: 48,
+      vx: 0,
+      vy: 0,
+      speed: 300,      // velocidade horizontal quando tecla pressionada (px/s)
+      friction: 1600,  // desaceleração quando solta a tecla
+      jumpForce: 620,  // velocidade inicial do pulo (px/s)
+      isOnGround: false
+    };
+
+    // Estado das teclas
+    const keys = { left:false, right:false, up:false };
+
+    // Controles de teclado
+    window.addEventListener('keydown', e => {
+      if (e.repeat) return; // evita repetição automática de tecla
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.code === 'Space') keys.up = true;
+
+      // permitem pulo instantâneo ao pressionar (se no chão)
+      if (keys.up && player.isOnGround) {
+        player.vy = -player.jumpForce;
+        player.isOnGround = false;
+      }
+    });
+
+    window.addEventListener('keyup', e => {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.code === 'Space') keys.up = false;
+    });
+
+    // Função que retorna a coordenada Y do chão
+    function groundY() {
+      return H - groundHeight;
+    }
+
+    // Loop principal
+    let last = null;
+    function loop(timestamp) {
+      if (!last) last = timestamp;
+      const dt = Math.min((timestamp - last) / 1000, 0.032); // limitar dt para estabilidade
+      last = timestamp;
+
+      update(dt);
+      render();
+
+      requestAnimationFrame(loop);
+    }
+
+    // Atualiza física e posição
+    function update(dt) {
+      // Controles horizontais: aplica velocidade alvo
+      if (keys.left && !keys.right) {
+        player.vx = -player.speed;
+      } else if (keys.right && !keys.left) {
+        player.vx = player.speed;
+      } else {
+        if (player.vx > 0) {
+          player.vx = Math.max(0, player.vx - player.friction * dt);
+        } else if (player.vx < 0) {
+          player.vx = Math.min(0, player.vx + player.friction * dt);
+        }
+      }
+
+      // Gravidade
+      player.vy += gravity * dt;
+
+      // Atualiza posições
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+
+      // Colisão simples com as bordas do canvas
+      if (player.x < 8) { player.x = 8; player.vx = 0; }
+      if (player.x + player.w > W - 8) { player.x = W - 8 - player.w; player.vx = 0; }
+
+      // Colisão com o chão
+      const gY = groundY();
+      if (player.y + player.h >= gY) {
+        player.y = gY - player.h;
+        player.vy = 0;
+        player.isOnGround = true;
+      } else {
+        player.isOnGround = false;
+      }
+    }
+
+    // Renderização
+    function render() {
+      // Limpar
+      ctx.clearRect(0,0,W,H);
+
+      // Céu
+      ctx.fillStyle = '#0b0b0b';
+      ctx.fillRect(0,0,W,H);
+
+      // Plano de fundo simples
+      // chão
+      ctx.fillStyle = '#2c2c2c';
+      ctx.fillRect(0, groundY(), W, groundHeight);
+
+      // desenhar linhas no chão
+      ctx.strokeStyle = '#333';
+      ctx.beginPath();
+      for (let x = 0; x < W; x += 40) {
+        ctx.moveTo(x, groundY());
+        ctx.lineTo(x, groundY() + 8);
+      }
+      ctx.stroke();
+
+      // Jogador (retângulo)
+      ctx.fillStyle = '#f2f2f2';
+      ctx.fillRect(Math.round(player.x), Math.round(player.y), player.w, player.h);
+
+      // olhos do boneco para dar sensação de direção
+      ctx.fillStyle = '#111';
+      const eyeY = player.y + 12;
+      if (player.vx >= 0) {
+     // olhando pra direita
+        ctx.fillRect(player.x + player.w - 12, eyeY, 6, 6);
+      } else {
+        // olhando pra esquerda
+        ctx.fillRect(player.x + 6, eyeY, 6, 6);
+      }
+
+      // HUD simples: velocidade e estado
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(8,8,200,52);
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`vx: ${player.vx.toFixed(1)} px/s`, 16, 26);
+      ctx.fillText(`vy: ${player.vy.toFixed(1)} px/s`, 16, 44);
+      ctx.fillText(`noChao: ${player.isOnGround}`, 120, 26);
+
+    }
+
+    // Inicia o loop
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
