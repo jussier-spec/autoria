@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cafeteria JS Pura</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        
+        const API_URL = 'http://localhost:3000/cafes';
+        const STORAGE_KEY = 'coffeeCart';
+        const root = document.getElementById('root');
+
+        function createElement(tag, attributes = {}, children = null) {
+            const element = document.createElement(tag);
+            
+            for (const key in attributes) {
+                if (attributes.hasOwnProperty(key)) {
+                    element.setAttribute(key, attributes[key]);
+                }
+            }
+
+            if (children) {
+                const childrenArray = Array.isArray(children) ? children : [children];
+                childrenArray.forEach(child => {
+                    if (typeof child === 'string') {
+                        element.appendChild(document.createTextNode(child));
+                    } else if (child instanceof HTMLElement) {
+                        element.appendChild(child);
+                    }
+                });
+            }
+
+            return element;
+        }
+
+        function renderHeader(cartCount) {
+            const header = createElement('header', { class: 'navbar navbar-expand-lg navbar-light bg-light sticky-top shadow-sm' });
+            const container = createElement('div', { class: 'container' });
+
+            const brand = createElement('a', { class: 'navbar-brand', href: '#index' }, '☕ Cafeteria Syber café');
+            brand.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.hash = 'index';
+            });
+
+            const cartIcon = createElement('span', { class: 'position-relative me-3' });
+            const icon = createElement('i', { 
+                class: 'fas fa-shopping-cart fa-lg', 
+                style: 'cursor: pointer;' 
+            });
+            icon.addEventListener('click', () => {
+                window.location.hash = 'cart';
+            });
+
+            const badge = createElement('span', { 
+                class: 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger',
+                id: 'cart-count'
+            }, cartCount > 0 ? String(cartCount) : '');
+            
+            if (cartCount === 0) {
+                badge.style.display = 'none';
+            }
+
+            cartIcon.appendChild(icon);
+            cartIcon.appendChild(badge);
+
+            const navDiv = createElement('div', { class: 'd-flex' }, [cartIcon]);
+            
+            container.appendChild(brand);
+            container.appendChild(navDiv);
+            header.appendChild(container);
+
+            const existingHeader = root.querySelector('header');
+            if (existingHeader) {
+                existingHeader.remove();
+            }
+            root.prepend(header); 
+        }
+
+        function updateCartCount(count) {
+            const badge = document.getElementById('cart-count');
+            if (badge) {
+                badge.textContent = count > 0 ? String(count) : '';
+                badge.style.display = count > 0 ? 'block' : 'none';
+            }
+        }
+
+        async function getCoffeeList() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP! Status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Falha ao obter cafés:', error);
+                return []; 
+            }
+        }
+
+        function getCartItems() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            return data ? JSON.parse(data) : []; 
+        }
+
+        function saveCartItems(items) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+            updateCartCount(calculateTotalItems(items));
+        }
+
+        function calculateTotalItems(items = getCartItems()) {
+            return items.reduce((total, item) => total + item.quantity, 0);
+        }
+
+        function addItemToCart(coffee) {
+            const items = getCartItems();
+            const existingItem = items.find(item => item.id === coffee.id);
+
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                items.push({
+                    id: coffee.id,
+                    title: coffee.title,
+                    price: coffee.price,
+                    quantity: 1
+                });
+            }
+
+            saveCartItems(items);
+            alert(`${coffee.title} adicionado ao carrinho!`);
+        }
+
+        function updateItemQuantity(itemId, delta) {
+            let items = getCartItems();
+            const item = items.find(i => i.id === itemId);
+
+            if (item) {
+                item.quantity += delta;
+
+                if (item.quantity <= 0) {
+                    items = items.filter(i => i.id !== itemId);
+                }
+                saveCartItems(items);
+                
+                router(); 
+            }
+        }
+
+        
+        function removeItemFromCart(itemId) {
+            let items = getCartItems();
+            items = items.filter(i => i.id !== itemId);
+            saveCartItems(items);
+            
+            router(); 
+        }
+
+        function calculateCartTotal() {
+            const items = getCartItems();
+            return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+        }
+
+        function clearCart() {
+            localStorage.removeItem(STORAGE_KEY);
+            updateCartCount(0);
+        }
+
+        function router() {
+            const path = window.location.hash.slice(1) || 'index'; 
+            const cartCount = calculateTotalItems();
+            
+            renderHeader(cartCount); 
+
+            const mainContent = root.querySelector('main') || createElement('main');
+            if (!root.querySelector('main')) {
+                root.appendChild(mainContent);
+            }
+            mainContent.innerHTML = ''; 
+            
+            document.title = `Cafeteria Syber café - ${path.charAt(0).toUpperCase() + path.slice(1)}`;
+
+            switch (path) {
+                case 'index':
+                    renderHomePage(mainContent);
+                    break;
+                case 'cart':
+                    renderCartPage(mainContent);
+                    break;
+                case 'checkout':
+                    renderCheckoutPage(mainContent);
+                    break;
+                default:
+                    renderNotFoundPage(mainContent);
+                    break;
+            }
+        }
+
+        async function renderHomePage(container) {
+            const coffeeList = await getCoffeeList();
+
+            const title = createElement('h1', { class: 'my-4 text-center' }, 'Nossos Cafés ☕');
+            container.appendChild(title);
+
+            if (coffeeList.length === 0) {
+                const errorMsg = createElement('p', { class: 'text-center text-danger' }, 'Não foi possível carregar a lista de cafés. Verifique se o json-server está rodando.');
+                container.appendChild(errorMsg);
+                return;
+            }
+
+            const row = createElement('div', { class: 'row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 p-3' });
+
+            coffeeList.forEach(coffee => {
+                const card = createCoffeeCard(coffee);
+                const col = createElement('div', { class: 'col' }, card);
+                row.appendChild(col);
+            });
+
+            container.appendChild(row);
+        }
+
+        function createCoffeeCard(coffee) {
+            const card = createElement('div', { class: 'card h-100 shadow-sm' });
+            
+            const img = createElement('img', { 
+                src: coffee.image, 
+                class: 'card-img-top', 
+                alt: coffee.title,
+                style: 'height: 200px; object-fit: cover;'
+            });
+            
+            const cardBody = createElement('div', { class: 'card-body d-flex flex-column' });
+            
+            const title = createElement('h5', { class: 'card-title' }, coffee.title);
+            const description = createElement('p', { class: 'card-text flex-grow-1' }, coffee.description);
+            const ingredients = createElement('p', { class: 'card-text small text-muted' }, 
+                `Ingredientes: ${coffee.ingredients.join(', ')}`);
+            const price = createElement('p', { class: 'card-text fw-bold fs-4 text-primary' }, 
+                `R$ ${coffee.price.toFixed(2)}`);
+
+            const addButton = createElement('button', { 
+                class: 'btn btn-success mt-2' 
+            }, 'Adicionar ao Carrinho');
+            
+            addButton.addEventListener('click', () => {
+                
+                addItemToCart(coffee);
+            });
+
+            cardBody.appendChild(title);
+            cardBody.appendChild(description);
+            cardBody.appendChild(ingredients);
+            cardBody.appendChild(price);
+            cardBody.appendChild(addButton);
+            
+            card.appendChild(img);
+            card.appendChild(cardBody);
+            
+            return card;
+        }
+
+        function renderCartPage(container) {
+            const items = getCartItems();
+            const total = calculateCartTotal();
+
+            const title = createElement('h1', { class: 'my-4 text-center' }, '🛒 Seu Carrinho de Compras');
+            container.appendChild(title);
+
+            if (items.length === 0) {
+                const emptyMsg = createElement('div', { class: 'alert alert-info text-center m-5' }, [
+                    createElement('p', {}, 'Seu carrinho está vazio.'),
+                    createElement('a', { href: '#index', class: 'btn btn-primary' }, 'Voltar para a Loja')
+                ]);
+                container.appendChild(emptyMsg);
+                return;
+            }
+
+            const cartList = createElement('div', { class: 'list-group container col-lg-8 mx-auto' });
+            items.forEach(item => {
+                const cartItem = createCartItemElement(item);
+                cartList.appendChild(cartItem);
+            });
+            
+            const totalDisplay = createElement('div', { 
+                class: 'd-flex justify-content-between align-items-center p-3 mt-4 border-top border-2 container col-lg-8 mx-auto' 
+            }, [
+                createElement('h4', {}, 'Total Acumulado:'),
+                createElement('h4', { class: 'text-success' }, `R$ ${total.toFixed(2)}`)
+            ]);
+
+            const checkoutButton = createElement('a', { 
+                href: '#checkout', 
+                class: 'btn btn-primary btn-lg w-100 container col-lg-8 mx-auto my-3' 
+            }, 'Finalizar Compra');
+            
+            container.appendChild(cartList);
+            container.appendChild(totalDisplay);
+            container.appendChild(checkoutButton);
+        }
+
+        function createCartItemElement(item) {
+            const itemDiv = createElement('div', { 
+                class: 'list-group-item d-flex justify-content-between align-items-center' 
+            });
+
+            const infoDiv = createElement('div', {}, [
+                createElement('h5', { class: 'mb-1' }, item.title),
+                createElement('p', { class: 'mb-1 text-muted' }, `Preço: R$ ${item.price.toFixed(2)}`)
+            ]);
+
+            const controlsDiv = createElement('div', { class: 'd-flex align-items-center' });
+
+            const removeBtn = createElement('button', { class: 'btn btn-sm btn-outline-secondary me-2' }, '-');
+            removeBtn.addEventListener('click', () => updateItemQuantity(item.id, -1));
+
+            const quantitySpan = createElement('span', { class: 'mx-2 fw-bold' }, String(item.quantity));
+
+            const addBtn = createElement('button', { class: 'btn btn-sm btn-outline-secondary me-3' }, '+');
+            addBtn.addEventListener('click', () => updateItemQuantity(item.id, 1));
+            
+            const subtotalSpan = createElement('span', { class: 'fw-bold me-3 text-primary' }, 
+                `R$ ${(item.price * item.quantity).toFixed(2)}`);
+
+            const removeFullBtn = createElement('button', { class: 'btn btn-sm btn-danger' }, 
+                createElement('i', { class: 'fas fa-trash' }));
+            removeFullBtn.addEventListener('click', () => removeItemFromCart(item.id));
+
+            controlsDiv.appendChild(removeBtn);
+            controlsDiv.appendChild(quantitySpan);
+            controlsDiv.appendChild(addBtn);
+            controlsDiv.appendChild(subtotalSpan);
+            controlsDiv.appendChild(removeFullBtn);
+
+            itemDiv.appendChild(infoDiv);
+            itemDiv.appendChild(controlsDiv);
+
+            return itemDiv;
+        }
+
+        function renderCheckoutPage(container) {
+            const items = getCartItems();
+            const total = calculateCartTotal();
+
+            const title = createElement('h1', { class: 'my-4 text-center' }, '🎉 Finalizar Compra');
+            container.appendChild(title);
+
+            if (items.length === 0) {
+                const emptyMsg = createElement('div', { class: 'alert alert-warning text-center m-5' }, [
+                    createElement('p', {}, 'Seu carrinho está vazio. Adicione itens antes de finalizar.'),
+                    createElement('a', { href: '#index', class: 'btn btn-primary' }, 'Voltar para a Loja')
+                ]);
+                container.appendChild(emptyMsg);
+                return;
+            }
+
+            const formContainer = createElement('div', { class: 'container col-lg-6 mx-auto p-4 border rounded shadow-sm' });
+
+            const summaryHeader = createElement('h3', { class: 'mb-3' }, 'Resumo do Pedido');
+            const summaryList = createElement('ul', { class: 'list-group mb-4' });
+            items.forEach(item => {
+                const listItem = createElement('li', { 
+                    class: 'list-group-item d-flex justify-content-between' 
+                }, [
+                    createElement('span', {}, `${item.title} (x${item.quantity})`),
+                    createElement('span', {}, `R$ ${(item.price * item.quantity).toFixed(2)}`)
+                ]);
+                summaryList.appendChild(listItem);
+            });
+            const totalItem = createElement('li', { 
+                class: 'list-group-item d-flex justify-content-between fw-bold bg-light' 
+            }, [
+                createElement('span', {}, 'Total a Pagar:'),
+                createElement('span', { class: 'text-success fs-5' }, `R$ ${total.toFixed(2)}`)
+            ]);
+            summaryList.appendChild(totalItem);
+
+            const form = createElement('form', { id: 'checkout-form' });
+
+            const addressGroup = createElement('div', { class: 'mb-3' });
+            addressGroup.appendChild(createElement('label', { for: 'address', class: 'form-label' }, 'Endereço de Entrega'));
+            const addressInput = createElement('input', { 
+                type: 'text', 
+                class: 'form-control', 
+                id: 'address', 
+                required: 'required' 
+            });
+            addressGroup.appendChild(addressInput);
+
+            const paymentGroup = createElement('div', { class: 'mb-3' });
+            paymentGroup.appendChild(createElement('label', { for: 'payment-method', class: 'form-label' }, 'Método de Pagamento'));
+            const paymentSelect = createElement('select', { 
+                class: 'form-select', 
+                id: 'payment-method', 
+                required: 'required' 
+            }, [
+                createElement('option', { value: '', selected: 'selected', disabled: 'disabled' }, 'Selecione...'),
+                createElement('option', { value: 'credit' }, 'Cartão de Crédito'),
+                createElement('option', { value: 'boleto' }, 'Boleto Bancário'),
+                createElement('option', { value: 'pix' }, 'PIX')
+            ]);
+            paymentGroup.appendChild(paymentSelect);
+
+            const finishButton = createElement('button', { 
+                type: 'submit', 
+                class: 'btn btn-success btn-lg w-100 mt-3' 
+            }, 'Confirmar Compra');
+
+            form.appendChild(addressGroup);
+            form.appendChild(paymentGroup);
+            form.appendChild(finishButton);
+            
+            form.addEventListener('submit', (e) => {
+                e.preventDefault(); 
+                handleCheckout(addressInput.value, paymentSelect.value, container);
+            });
+
+            formContainer.appendChild(summaryHeader);
+            formContainer.appendChild(summaryList);
+            formContainer.appendChild(form);
+
+            container.appendChild(formContainer);
+        }
+
+        function handleCheckout(address, paymentMethod, container) {
+            if (!address || !paymentMethod) {
+                alert('Por favor, preencha todos os campos.');
+                return;
+            }
+
+            clearCart();
+
+            container.innerHTML = '';
+            renderHeader(0); 
+
+            const successMessage = createElement('div', { class: 'container my-5 text-center' }, [
+                createElement('h1', { class: 'text-success mb-4' }, '✅ Compra Finalizada com Sucesso!'),
+                createElement('p', { class: 'lead' }, 'Obrigado por sua compra. Seu pedido será enviado para:'),
+                createElement('p', { class: 'fw-bold' }, address),
+                createElement('p', { class: 'mt-3' }, `Método de Pagamento: ${paymentMethod.toUpperCase()}`),
+                createElement('a', { href: '#index', class: 'btn btn-primary btn-lg mt-4' }, 'Voltar para a Página Inicial')
+            ]);
+
+            container.appendChild(successMessage);
+        }
+
+        function renderNotFoundPage(container) {
+            const content = createElement('div', { class: 'container my-5 text-center' }, [
+                createElement('h1', { class: 'text-danger' }, '404 - Página Não Encontrada'),
+                createElement('p', { class: 'lead' }, 'A página que você está procurando não existe.'),
+                createElement('a', { href: '#index', class: 'btn btn-primary mt-3' }, 'Voltar para a Página Inicial')
+            ]);
+            container.appendChild(content);
+        }
+
+        function init() {
+
+            window.addEventListener('hashchange', router);
+
+            router(); 
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+    </body>
+</html>
